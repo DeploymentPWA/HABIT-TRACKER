@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Discipline Tracker</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+<div id="liveClock" class="live-clock"></div>
+
+  <!-- HEADER -->
+  <header>
+    <h1>Daily Discipline</h1>
+    <div id="phaseInfo">Loading…</div>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main>
+    <!-- Main active event card -->
+    <div id="eventCard" class="card">
+      <h2>Initializing…</h2>
+      <p>Checking schedule</p>
+    </div>
+
+    <!-- Hydration action strip (hidden by default) -->
+    <div
+      id="hydrationStrip"
+      class="card"
+      style="display:none; margin-top:12px; text-align:center;"
+    >
+      <p style="margin-bottom:8px;">💧 Drink Water</p>
+      <button id="markWaterBtn">✔ Mark Done</button>
+    </div>
+  </main>
+
+  <!-- FOOTER NAV -->
+  <footer>
+    <button id="historyBtn">📘 History</button>
+    <button id="statsBtn">📊 Stats</button>
+    <button onclick="goAdmin()" title="Admin">⚙️</button>
+  </footer>
+
+  <!-- Core Logic -->
+  <script src="app.js"></script>
+
+  <!-- Admin Navigation -->
+  <script>
+    function goAdmin() {
+      location.href = "admin.html";
+    }
+  </script>
+
+</body>
+</html>

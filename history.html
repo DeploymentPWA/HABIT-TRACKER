@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discipline History</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>Past Days</h1>
+  <div id="summary">Your discipline record</div>
+</header>
+
+<main id="historyContainer">
+  <!-- Cards will be injected here -->
+</main>
+
+<footer>
+  <button onclick="goHome()">⬅ Home</button>
+</footer>
+
+<script>
+/* ========= HELPERS ========= */
+function getAllDays() {
+  return Object.keys(localStorage)
+    .filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k))
+    .sort()
+    .reverse();
+}
+
+function calcDayStats(log) {
+  const total = log.length * 10;
+  const earned = log.reduce((s, e) => s + e.score, 0);
+  const percent = total ? Math.round((earned / total) * 100) : 0;
+
+  let remark = "Discipline unstable.";
+  if (percent >= 85) remark = "Strong discipline. Exam-ready.";
+  else if (percent >= 70) remark = "Average. Needs tightening.";
+  else remark = "Poor discipline. Serious correction needed.";
+
+  return { percent, remark };
+}
+
+/* ========= RENDER ========= */
+const container = document.getElementById("historyContainer");
+const days = getAllDays();
+
+if (days.length === 0) {
+  container.innerHTML = `
+    <div class="card">
+      <h2>No data yet</h2>
+      <p>Start following your schedule.</p>
+    </div>
+  `;
+}
+
+days.forEach(day => {
+  const log = JSON.parse(localStorage.getItem(day)) || [];
+  const { percent, remark } = calcDayStats(log);
+
+  const card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML = `
+    <h2>${day}</h2>
+    <p><strong>Score:</strong> ${percent}%</p>
+    <p>${remark}</p>
+  `;
+  container.appendChild(card);
+});
+
+/* ========= NAV ========= */
+function goHome() {
+  window.location.href = "index.html";
+}
+</script>
+
+</body>
+</html>

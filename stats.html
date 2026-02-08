@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Discipline & Hydration Stats</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<header style="display:flex; flex-direction:column; gap:10px;">
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <h1>Stats Dashboard</h1>
+    <button onclick="goHome()">⬅ Home</button>
+  </div>
+
+  <div>
+    <button onclick="setRange('day')">Today</button>
+    <button onclick="setRange('week')">This Week</button>
+    <button onclick="setRange('month')">This Month</button>
+  </div>
+</header>
+
+
+<main style="
+  padding:10px;
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+  max-width:900px;
+  margin:0 auto;
+">
+
+  <!-- DISCIPLINE -->
+  <div class="card">
+    <h2>📈 Discipline Trend</h2>
+    <canvas id="lineChart"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>📊 Phase Performance</h2>
+    <canvas id="barChart"></canvas>
+  </div>
+
+  <!-- TIME WASTE -->
+  <div class="card">
+    <h2>⏳ Time Waste (Minutes)</h2>
+    <canvas id="wasteBar"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>⚖️ Productive vs Wasted Time</h2>
+    <canvas id="wastePie"></canvas>
+  </div>
+
+  <!-- HYDRATION -->
+  <div class="card">
+    <h2>💧 Hydration Trend</h2>
+    <canvas id="hydrationLine"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>💧 Hydration Consistency</h2>
+    <canvas id="hydrationBar"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>🔥 Severity Loss</h2>
+    <canvas id="pieChart"></canvas>
+  </div>
+</main>
+
+<footer>
+  <button onclick="goHome()">⬅ Home</button>
+</footer>
+
+<script>
+function formatDateDMY(iso) {
+  const [y, m, d] = iso.split("-");
+  return `${d}-${m}-${y}`;
+}
+
+/* ================= HELPERS ================= */
+function formatDateDMY(dateStr) {
+  if (!dateStr) return "";
+  const parts = dateStr.split("-");
+  if (parts.length !== 3) return dateStr;
+  return `${parts[2]}-${parts[1]}-${parts[0]}`;
+}
+
+
+function toMin(t) {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function getTimetable() {
+  return JSON.parse(localStorage.getItem("timetable")) || [];
+}
+
+function todayKey(d = new Date()) {
+  return d.toISOString().split("T")[0];
+}
+
+function getLogs(daysBack) {
+  const out = [];
+  for (let i = 0; i < daysBack; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = todayKey(d);
+    const log = JSON.parse(localStorage.getItem(key));
+    if (log) out.push({ date: key, log });
+  }
+  return out.reverse();
+}
+
+let range = "day";
+let charts = [];
+
+function setRange(r) {
+  range = r;
+  draw();
+}
+
+/* ================= DRAW ================= */
+
+function draw() {
+  let days = range === "day" ? 1 : range === "week" ? 7 : 30;
+  const data = getLogs(days);
+    const hasAnyLogs = data.some(d => d.log && d.log.length > 0);
+
+  charts.forEach(c => c.destroy());
+  charts = [];
+
+  /* ---------- DISCIPLINE LINE ---------- */
+  const dLabels = [];
+  const dPercents = [];
+
+  data.forEach(d => {
+    const max = d.log.reduce((s,e)=>s+e.severity*10,0);
+    const got = d.log.reduce((s,e)=>s+e.score,0);
+    dLabels.push(formatDateDMY(d.date));
+dPercents.push(
+  max ? Math.round((got / max) * 100) : 0
+);
+  });
+
+  charts.push(new Chart(lineChart,{
+    type:"line",
+    data:{labels:dLabels,datasets:[{label:"Discipline Score ( /100 )"
+,data:dPercents,borderWidth:2}]}
+  }));
+
+  /* ---------- PHASE BAR ---------- */
+  const pSum={1:0,2:0,3:0,4:0}, pMax={1:0,2:0,3:0,4:0};
+  data.forEach(d=>d.log.forEach(e=>{
+    pSum[e.phase]+=e.score;
+    pMax[e.phase]+=e.severity*10;
+  }));
+
+  charts.push(new Chart(barChart,{
+    type:"bar",
+    data:{
+      labels:["P1","P2","P3","P4"],
+      datasets:[{label:"Avg %",data:[1,2,3,4].map(p=>pMax[p]?Math.round(pSum[p]/pMax[p]*100):0)}]
+    }
+  }));
+
+  /* ---------- SEVERITY PIE ---------- */
+
+    /* ---------- TIME WASTE ---------- */
+const timetable = getTimetable();
+
+if (!hasAnyLogs) {
+  // No activity recorded → show neutral charts
+  charts.push(new Chart(wastePie, {
+    type: "pie",
+    data: {
+      labels: ["No Data"],
+      datasets: [{
+        data: [1],
+        backgroundColor: ["#e0e0e0"]
+      }]
+    },
+    options: {
+      plugins: {
+        tooltip: { enabled: false },
+        legend: { display: false }
+      }
+    }
+  }));
+
+  charts.push(new Chart(wasteBar, {
+    type: "bar",
+    data: {
+      labels: ["No Data"],
+      datasets: [{
+        label: "Minutes Wasted",
+        data: [0]
+      }]
+    }
+  }));
+
+  return; // ⛔ stop further waste calculation
+}
+  const wLabels = [];
+  const wData = [];
+
+  let totalWaste = 0;
+  let totalScheduled = 0;
+
+  data.forEach(d => {
+    let dayWaste = 0;
+    let dayScheduled = 0;
+
+    timetable.forEach(ev => {
+      const duration = toMin(ev.end) - toMin(ev.start);
+      dayScheduled += duration;
+
+      const log = d.log.find(l => l.name === ev.name);
+      if (!log) {
+  // completely skipped
+  dayWaste += duration;
+} else {
+  // if auto-missed (999), count full duration
+  dayWaste += log.delay >= duration ? duration : log.delay;
+}
+
+
+    });
+
+    totalWaste += dayWaste;
+    totalScheduled += dayScheduled;
+
+    wLabels.push(formatDateDMY(d.date));
+
+    wData.push(dayWaste);
+  });
+
+  charts.push(new Chart(wasteBar, {
+    type: "bar",
+    data: {
+      labels: wLabels,
+      datasets: [{
+        label: "Minutes Wasted",
+        data: wData
+      }]
+    }
+  }));
+
+  const wastePercent = totalScheduled
+  ? Math.round((totalWaste / totalScheduled) * 100)
+  : 0;
+
+charts.push(new Chart(wastePie, {
+  type: "pie",
+  data: {
+    labels: ["Productive %", "Wasted %"],
+    datasets: [{
+      data: [
+        100 - wastePercent,
+        wastePercent
+      ]
+    }]
+  }
+}));
+
+
+  const loss = {1:0,2:0,3:0};
+const maxLoss = {1:0,2:0,3:0};
+
+data.forEach(d => d.log.forEach(e => {
+  // ✅ only finalized MAIN events
+  if (
+    e.phase !== "micro" &&
+    e.score !== null &&
+    e.delay !== 999
+  ) {
+    const max = e.severity * 10;
+    const lost = max - e.score;
+
+    loss[e.severity] += lost;
+    maxLoss[e.severity] += max;
+  }
+}));
+
+
+const lossPercent = {
+  1: maxLoss[1] ? Math.round(loss[1] / maxLoss[1] * 100) : 0,
+  2: maxLoss[2] ? Math.round(loss[2] / maxLoss[2] * 100) : 0,
+  3: maxLoss[3] ? Math.round(loss[3] / maxLoss[3] * 100) : 0,
+};
+
+
+  charts.push(new Chart(pieChart,{
+    type:"pie",
+    data:{
+      labels:["Severity 1","Severity 2","Severity 3"],
+      datasets:[{data:[lossPercent[1],lossPercent[2],lossPercent[3]]}]
+
+    }
+  }));
+
+  /* ---------- HYDRATION ---------- */
+  const hLabels=[], hPercent=[], hDone=[];
+
+  data.forEach(d=>{
+    const drinks = d.log.filter(e=>e.name==="Drink Water");
+    const done = drinks.filter(e=>e.score>0).length;
+    hLabels.push(formatDateDMY(d.date));
+
+    hDone.push(done);
+    hPercent.push(drinks.length?Math.round(done/drinks.length*100):0);
+  });
+
+  charts.push(new Chart(hydrationLine,{
+    type:"line",
+    data:{labels:hLabels,datasets:[{label:"Hydration %",data:hPercent,borderWidth:2}]}
+  }));
+
+  charts.push(new Chart(hydrationBar,{
+    type:"bar",
+    data:{labels:hLabels,datasets:[{label:"Drink Water Done",data:hDone}]}
+  }));
+}
+
+function goHome(){location.href="index.html";}
+draw();
+</script>
+
+</body>
+</html>

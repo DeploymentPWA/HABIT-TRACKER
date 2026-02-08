@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin – Timetable</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+
+  <style>
+    /* Sticky admin action bar */
+    .admin-bar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: linear-gradient(135deg, #f7f3eb, #eef6f8);
+      padding: 10px;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Admin Panel</h1>
+  <div>Restricted Access</div>
+</header>
+
+<!-- 🔒 STICKY SAVE BAR -->
+<div class="admin-bar" id="adminBar" style="display:none">
+  <button onclick="saveTimetable()">💾 Save</button>
+  <button onclick="addEvent()">➕ Add Event</button>
+  <button onclick="goHome()">⬅ Home</button>
+</div>
+
+<main id="main"></main>
+
+<script>
+/* ================= PIN LOGIC ================= */
+
+const main = document.getElementById("main");
+const adminBar = document.getElementById("adminBar");
+
+function askForPin() {
+  const savedPin = localStorage.getItem("adminPin");
+
+  if (!savedPin) {
+    main.innerHTML = `
+      <div class="card">
+        <h2>Set Admin PIN</h2>
+        <input id="newPin" type="password" placeholder="Create PIN">
+        <button onclick="setPin()">Set PIN</button>
+      </div>
+    `;
+  } else {
+    main.innerHTML = `
+      <div class="card">
+        <h2>Enter Admin PIN</h2>
+        <input id="pinInput" type="password" placeholder="Enter PIN">
+        <button onclick="verifyPin()">Unlock</button>
+      </div>
+    `;
+  }
+}
+
+function setPin() {
+  const pin = document.getElementById("newPin").value.trim();
+  if (pin.length < 4) {
+    alert("PIN must be at least 4 digits.");
+    return;
+  }
+  localStorage.setItem("adminPin", pin);
+  alert("PIN set. Remember it.");
+  loadAdmin();
+}
+
+function verifyPin() {
+  const pin = document.getElementById("pinInput").value.trim();
+  if (pin === localStorage.getItem("adminPin")) {
+    loadAdmin();
+  } else {
+    alert("Wrong PIN.");
+  }
+}
+
+/* ================= ADMIN CORE ================= */
+
+function loadTimetable() {
+  return JSON.parse(localStorage.getItem("timetable")) || [];
+}
+
+function saveTimetable() {
+  const rows = document.querySelectorAll(".event-row");
+  const timetable = [];
+
+  rows.forEach(row => {
+    const name = row.querySelector(".name").value.trim();
+    const start = row.querySelector(".start").value;
+    const end = row.querySelector(".end").value;
+    const phase = Number(row.querySelector(".phase").value);
+    const severity = Number(row.querySelector(".severity").value);
+
+    if (!name || !start || !end) return;
+
+    timetable.push({ name, start, end, phase, severity });
+  });
+
+  localStorage.setItem("timetable", JSON.stringify(timetable));
+  localStorage.setItem("timetableUpdated", Date.now());
+
+  alert("Timetable saved.");
+}
+
+let timetable = [];
+
+function loadAdmin() {
+  adminBar.style.display = "flex";
+  timetable = loadTimetable();
+
+  if (timetable.length === 0) {
+    timetable = [{
+      name: "Sample Event",
+      start: "05:30",
+      end: "06:00",
+      phase: 1,
+      severity: 3
+    }];
+  }
+  render();
+}
+
+function render() {
+  main.innerHTML = "";
+  timetable.forEach((e, i) => {
+    const div = document.createElement("div");
+    div.className = "card event-row";
+    div.innerHTML = `
+      <input class="name" placeholder="Event name" value="${e.name}">
+      
+      <label>Start</label>
+      <input class="start" type="time" value="${e.start}">
+      
+      <label>End</label>
+      <input class="end" type="time" value="${e.end}">
+      
+      <label>Phase</label>
+      <select class="phase">
+        ${[1,2,3,4].map(p =>
+          `<option value="${p}" ${p===e.phase?"selected":""}>Phase ${p}</option>`
+        ).join("")}
+      </select>
+
+      <label>Severity</label>
+      <select class="severity">
+        <option value="3" ${e.severity===3?"selected":""}>3 – Critical</option>
+        <option value="2" ${e.severity===2?"selected":""}>2 – Important</option>
+        <option value="1" ${e.severity===1?"selected":""}>1 – Light</option>
+      </select>
+
+      <button onclick="removeEvent(${i})">🗑 Delete</button>
+    `;
+    main.appendChild(div);
+  });
+}
+
+function addEvent() {
+  timetable.push({
+    name: "",
+    start: "",
+    end: "",
+    phase: 1,
+    severity: 3
+  });
+  render();
+}
+
+function removeEvent(i) {
+  timetable.splice(i, 1);
+  render();
+}
+
+function goHome() {
+  location.href = "index.html";
+}
+
+/* ================= INIT ================= */
+askForPin();
+</script>
+
+</body>
+</html>
