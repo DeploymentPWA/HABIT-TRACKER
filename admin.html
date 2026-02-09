@@ -108,7 +108,7 @@ function saveEvent(index) {
   const severity = Number(row.querySelector(".severity").value);
 
   if (!name || !start || !end) {
-    alert("Please fill name, start and end time.");
+    alert("Please fill: event name, start time and end time.");
     return;
   }
 
@@ -116,15 +116,21 @@ function saveEvent(index) {
   const endMin   = timeToMinutes(end);
 
   if (startMin >= endMin) {
-    alert("Start time must be before end time.");
+    alert("Start time must be earlier than end time.");
     return;
   }
 
+  // Update the existing event
   timetable[index] = { name, start, end, phase, severity };
+
+  // Save
   localStorage.setItem("timetable", JSON.stringify(timetable));
   localStorage.setItem("timetableUpdated", Date.now());
 
-  alert("Event saved.");
+  alert(`"${name}" saved / updated successfully.`);
+
+  // Refresh the list (very important!)
+  render();
 }
 
 function loadAdmin() {
@@ -144,7 +150,16 @@ function loadAdmin() {
 }
 
 function render() {
+  // Sort events by start time every time we show them
+  timetable.sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
+
   main.innerHTML = "";
+
+  if (timetable.length === 0) {
+    main.innerHTML = '<div class="card" style="text-align:center; padding:30px; color:#666;">No events yet.<br><br>Click "➕ Add Event" to create one.</div>';
+    return;
+  }
+
   timetable.forEach((event, i) => {
     const div = document.createElement("div");
     div.className = "card event-row";
@@ -171,8 +186,8 @@ function render() {
         <option value="1" ${event.severity === 1 ? "selected" : ""}>1 – Light</option>
       </select>
 
-      <div style="margin-top: 12px; display: flex; gap: 10px;">
-        <button onclick="saveEvent(${i})">💾 Save</button>
+      <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
+        <button onclick="saveEvent(${i})">💾 Save / Update</button>
         <button onclick="removeEvent(${i})">🗑 Delete</button>
       </div>
     `;
