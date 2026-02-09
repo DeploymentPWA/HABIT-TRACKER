@@ -343,3 +343,9 @@ canvas {
   letter-spacing: 1px;
   color: #1f4f63;
 }
+.history-day-card:hover {
+  background: #f0f8ff;
+  border: 1px solid #2196f3;
+  transform: scale(1.02);
+  transition: all 0.2s;
+}
