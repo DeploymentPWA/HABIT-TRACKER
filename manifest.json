@@ -1,28 +1,20 @@
 {
-  "name": "Habit Tracker",
-  "short_name": "HabitTrack",
-  "description": "Track daily discipline, events, hydration and build better habits",
-  "id": "/",
-  "start_url": "/index.html",
-  "scope": "/",
+  "name": "মাসিক বাজারের তালিকা",
+  "short_name": "বাজার তালিকা",
+  "start_url": "index.html",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#2196f3",
-  "orientation": "portrait-primary",
-  "categories": ["productivity", "health"],
+  "theme_color": "#4CAF50",
   "icons": [
     {
-      "src": "/assets/icon1.png",   
+      "src": "assets/icon.png",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     },
     {
-      "src": "/assets/icon1.png",
+      "src": "assets/icon.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
   ]
 }
-
