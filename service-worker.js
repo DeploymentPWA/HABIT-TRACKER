@@ -1,20 +1,18 @@
 // service-worker.js
 
-const CACHE_NAME = 'discipline-tracker-v1';  // ← change to v2, v3 etc. when you update files
+const CACHE_NAME = 'habit-tracker-v1';  // Change to v2, v3 etc. when you update files
 
-// List of files to cache (add ALL important files here)
 const STATIC_ASSETS = [
-  '/',                    // root → redirects to index.html
+  '/',
   '/index.html',
-  '/admin.html',          // if you have it
+  '/admin.html',
   '/stats.html',
   '/history.html',
   '/style.css',
   '/app.js',
   '/manifest.json',
-  '/icon-192.png',        // ← use your actual icon names
-  '/icon-512.png'
-  // add more if you have fonts, other images, etc.
+  '/assets/icon1.png'
+  // Add more files here if you have others (e.g. other images, fonts)
 ];
 
 self.addEventListener('install', event => {
@@ -26,7 +24,6 @@ self.addEventListener('install', event => {
       })
       .catch(err => console.error('Cache addAll failed:', err))
   );
-  // Skip waiting → new SW activates right away
   self.skipWaiting();
 });
 
@@ -40,12 +37,10 @@ self.addEventListener('activate', event => {
       );
     })
   );
-  // Take control of all open tabs immediately
   self.clients.claim();
 });
 
 self.addEventListener('fetch', event => {
-  // Only handle GET requests
   if (event.request.method !== 'GET') {
     event.respondWith(fetch(event.request));
     return;
@@ -54,19 +49,15 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request)
       .then(cachedResponse => {
-        // Return cache if found
         if (cachedResponse) {
           return cachedResponse;
         }
 
-        // Otherwise fetch from network
         return fetch(event.request).then(networkResponse => {
-          // Don't cache failed or non-200 responses
           if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
             return networkResponse;
           }
 
-          // Clone and cache the successful response
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME)
             .then(cache => {
@@ -75,8 +66,7 @@ self.addEventListener('fetch', event => {
 
           return networkResponse;
         }).catch(() => {
-          // Optional: offline fallback (you can add later)
-          // return caches.match('/offline.html');
+          // Optional: add offline fallback later
         });
       })
   );
