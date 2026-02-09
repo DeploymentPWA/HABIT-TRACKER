@@ -17,15 +17,27 @@ function notify(title, body) {
 
 /* ========= SOUND ALERT ========= */
 let soundPlayedForSlot = null;
-
+let ignoredHydrationSlots = [];  // array of {slot, startMin} that were ignored and need nagging
 function playAlertSound(slotKey) {
   if (soundPlayedForSlot === slotKey) return;
 
   const audio = new Audio(
     "https://actions.google.com/sounds/v1/alarms/beep_short.ogg"
   );
-  audio.play().catch(() => {});
-  soundPlayedForSlot = slotKey;
+
+  let count = 0;
+  const playThreeTimes = () => {
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+    count++;
+    if (count < 3) {
+      setTimeout(playThreeTimes, 1200); // ~1.2 seconds between beeps
+    } else {
+      soundPlayedForSlot = slotKey;
+    }
+  };
+
+  playThreeTimes();
 }
 function minutesToTime(mins) {
   const h = Math.floor(mins / 60);
@@ -118,140 +130,159 @@ function getActiveWaterEvent(mainEvent, entry) {
 }
 
 
+// Helper function – put this OUTSIDE of render(), for example right after render() ends
+function handleStartClick() {
+  const name     = this.dataset.name;
+  const start    = this.dataset.start;
+  const phase    = Number(this.dataset.phase);
+  const severity = Number(this.dataset.severity);
+
+  startMainEvent(name, start, phase, severity);
+}
+
+// ──────────────────────────────────────────────
+// Your render function – only small change at the end
+// ──────────────────────────────────────────────
 function render() {
     // Optimization: skip redraw if still in the same minute
-    const currentMinute = nowMinutes();
-    if (window.lastRenderMinute === currentMinute) {
-        return; // do nothing - no need to redraw
-    }
-    window.lastRenderMinute = currentMinute;
-
-    // ──────────────────────────────────────────────
-    // everything else stays exactly the same
-    // ──────────────────────────────────────────────
+    
 
     syncLogsWithTimetable();
 
-  const container = document.getElementById("mainContainer");
-  const phaseInfo = document.getElementById("phaseInfo");
+    const container = document.getElementById("mainContainer");
+    const phaseInfo = document.getElementById("phaseInfo");
 
-  if (!container) {
-    console.error("mainContainer not found in HTML");
-    return;
-  }
-
-  container.innerHTML = ""; // clear old content
-
-  const activeEvents = getCurrentMainEvent();
-  const log = getLog();
-  const waterInfo = shouldShowWaterReminder();
-if (waterInfo) {
-  const waterCard = document.createElement("div");
-  waterCard.className = "card";
-  waterCard.innerHTML = `
-    <h2>💧 Drink Water (Hour ${waterInfo.slot + 1})</h2>
-    <p>${formatNow()}</p>
-    <button class="start-btn" onclick="markWater(${waterInfo.slot}, ${waterInfo.startMinute})">
-      ✔ Done
-    </button>
-  `;
-  container.appendChild(waterCard);
-
-  // Add notification and sound here to always trigger when card shows
-  const slotKey = `${todayKey()}_daily_${waterInfo.slot}`;
-  if (!localStorage.getItem("notified_" + slotKey)) {
-    notify("💧 Drink Water", "Time for your hourly hydration!");
-    localStorage.setItem("notified_" + slotKey, "yes");
-  }
-  playAlertSound(slotKey);
-}
-
-  if (activeEvents.length === 0) {
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `
-      <h2>No scheduled block right now</h2>
-      <p>Check your timetable</p>
-    `;
-    container.appendChild(card);
-    phaseInfo.innerText = "—";
-      // Independent daily hydration reminder
-  const waterInfo = shouldShowWaterReminder();
-  if (waterInfo) {
-    const waterCard = document.createElement("div");
-    waterCard.className = "card";
-    waterCard.innerHTML = `
-      <h2>💧 Drink Water (Hour ${waterInfo.slot + 1})</h2>
-      <p>${formatNow()}</p>
-      <button class="start-btn" onclick="markWater(${waterInfo.slot}, ${waterInfo.startMinute})">
-        ✔ Done
-      </button>
-    `;
-    container.appendChild(waterCard);
-  }
-  }
-
-  phaseInfo.innerText = `Phase ${activeEvents.map(e => e.phase).join(', ')}`;
-
-  activeEvents.forEach(event => {
-    const entry = log.find(e => e.name === event.name);
-    const entryStatus = entry 
-      ? (entry.score === null ? "🟢 Started | Score: Pending" : `✅ Completed | Score: ${entry.score}`)
-      : '';
-
-    // Main event card
-    const eventCard = document.createElement("div");
-    eventCard.className = "card";
-    eventCard.innerHTML = `
-      <h2>${event.name}</h2>
-      <p>${formatNow()}</p>
-      <p>${event.start} – ${event.end}</p>
-      <p>Severity: ${event.severity}</p>
-      ${entryStatus ? `<p>${entryStatus}</p>` : ''}
-      ${!entry ? `
-        <button class="start-btn" 
-                onclick="startMainEvent('${event.name}', '${event.start}', ${event.phase}, ${event.severity})">
-          ▶ Start Event
-        </button>
-      ` : ''}
-    `;
-    container.appendChild(eventCard);
-
-    // Separate hydration card (only if applicable)
-    const water = getActiveWaterEvent(event, entry);
-    if (water) {
-      const waterCard = document.createElement("div");
-      waterCard.className = "card";
-      waterCard.innerHTML = `
-        <h2>💧 Drink Water</h2>
-        <p>${formatNow()}</p>
-        <p>During: ${event.name}</p>
-        <button class="start-btn" onclick="markMicro('${water.name}','${water.parent}',${water.slot},${water.startMinute})">
-          ✔ Done
-        </button>
-      `;
-      container.appendChild(waterCard);
+    if (!container) {
+        console.error("mainContainer not found in HTML");
+        return;
     }
-  });
-  // New: Finalize any pending past events in real-time
-activeEvents.forEach(event => {
-  const entry = log.find(e => e.name === event.name);
-  if (entry && entry.started && entry.score === null && nowMinutes() >= toMinutes(event.end)) {
-    finalizeMainEvent(entry);
-    saveLog(log);
-  }
-});
-// Force finalize any ended event with pending score during render
-activeEvents.forEach(event => {
-  const entry = log.find(e => e.name === event.name);
-  if (entry && entry.started && entry.score === null && nowMinutes() >= toMinutes(event.end)) {
-    finalizeMainEvent(entry);
-    saveLog(log);
-  }
-});
 
+    container.innerHTML = ""; // clear old content
+
+    const activeEvents = getCurrentMainEvent();
+    const log = getLog();
+    const waterInfo = shouldShowWaterReminder();
+    trackIgnoredHydration(waterInfo);
+    if (waterInfo) {
+        const waterCard = document.createElement("div");
+        waterCard.className = "card";
+        waterCard.innerHTML = `
+            <h2>💧 Drink Water (Hour ${waterInfo.slot + 1})</h2>
+            <p>${formatNow()}</p>
+            <button class="start-btn" onclick="markWater(${waterInfo.slot}, ${waterInfo.startMinute})">
+                ✔ Done
+            </button>
+        `;
+        container.appendChild(waterCard);
+
+        // Add notification and sound here to always trigger when card shows
+        const slotKey = `${todayKey()}_daily_${waterInfo.slot}`;
+        if (!localStorage.getItem("notified_" + slotKey)) {
+            notify("💧 Drink Water", "Time for your hourly hydration!");
+            localStorage.setItem("notified_" + slotKey, "yes");
+        }
+        playAlertSound(slotKey);
+    }
+
+    if (activeEvents.length === 0) {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+            <h2>No scheduled block right now</h2>
+            <p>Check your timetable</p>
+        `;
+        container.appendChild(card);
+        phaseInfo.innerText = "—";
+
+        // Independent daily hydration reminder
+        const waterInfo = shouldShowWaterReminder();
+        if (waterInfo) {
+            const waterCard = document.createElement("div");
+            waterCard.className = "card";
+            waterCard.innerHTML = `
+                <h2>💧 Drink Water (Hour ${waterInfo.slot + 1})</h2>
+                <p>${formatNow()}</p>
+                <button class="start-btn" onclick="markWater(${waterInfo.slot}, ${waterInfo.startMinute})">
+                    ✔ Done
+                </button>
+            `;
+            container.appendChild(waterCard);
+        }
+    }
+
+    phaseInfo.innerText = `Phase ${activeEvents.map(e => e.phase).join(', ')}`;
+
+    activeEvents.forEach(event => {
+        const entry = log.find(e => e.name === event.name);
+        const entryStatus = entry 
+            ? (entry.score === null ? "🟢 Started | Score: Pending" : `✅ Completed | Score: ${entry.score}`)
+            : '';
+
+        // Main event card
+        const eventCard = document.createElement("div");
+        eventCard.className = "card";
+        eventCard.innerHTML = `
+            <h2>${event.name}</h2>
+            <p>${formatNow()}</p>
+            <p>${event.start} – ${event.end}</p>
+            <p>Severity: ${event.severity}</p>
+            ${entryStatus ? `<p>${entryStatus}</p>` : ''}
+            ${!entry ? `
+                <button class="start-btn" 
+                        data-name="${event.name}" 
+                        data-start="${event.start}" 
+                        data-phase="${event.phase}" 
+                        data-severity="${event.severity}">
+                    ▶ Start Event
+                </button>
+            ` : ''}
+        `;
+        container.appendChild(eventCard);
+
+        // Separate hydration card (only if applicable)
+        const water = getActiveWaterEvent(event, entry);
+        if (water) {
+            const waterCard = document.createElement("div");
+            waterCard.className = "card";
+            waterCard.innerHTML = `
+                <h2>💧 Drink Water</h2>
+                <p>${formatNow()}</p>
+                <p>During: ${event.name}</p>
+                <button class="start-btn" onclick="markMicro('${water.name}','${water.parent}',${water.slot},${water.startMinute})">
+                    ✔ Done
+                </button>
+            `;
+            container.appendChild(waterCard);
+        }
+    });
+
+    // Finalize any pending past events in real-time
+    activeEvents.forEach(event => {
+        const entry = log.find(e => e.name === event.name);
+        if (entry && entry.started && entry.score === null && nowMinutes() >= toMinutes(event.end)) {
+            finalizeMainEvent(entry);
+            saveLog(log);
+        }
+    });
+
+    // Force finalize any ended event with pending score during render
+    activeEvents.forEach(event => {
+        const entry = log.find(e => e.name === event.name);
+        if (entry && entry.started && entry.score === null && nowMinutes() >= toMinutes(event.end)) {
+            finalizeMainEvent(entry);
+            saveLog(log);
+        }
+    });
+
+    // ──────────────────────────────────────────────
+    // IMPORTANT: Re-attach listeners to "Start Event" buttons EVERY TIME we render
+    // ──────────────────────────────────────────────
+    document.querySelectorAll('.start-btn[data-name]').forEach(btn => {
+        // Remove old listener first (prevents double clicks / memory issues)
+        btn.removeEventListener('click', handleStartClick);
+        btn.addEventListener('click', handleStartClick);
+    });
 }
-
 // Ensure the buttons are clickable by adding event listeners again after rendering new events.
 function bindEventButtons() {
   const startButtons = document.querySelectorAll(".start-btn");
@@ -290,7 +321,7 @@ function startMainEvent(name, start, phase, severity) {
   });
 
   saveLog(log);
-  render();
+render();
 }
 
 function finalizeMainEvent(entry) {
@@ -353,6 +384,29 @@ function autoMiss() {
   });
 
   saveLog(log);
+  // ──────────────────────────────────────────────
+  // NEW: Penalize ignored hydration slots at end of day
+  // ──────────────────────────────────────────────
+  const dayEnd = getDayEndMinute();
+  if (dayEnd !== null && now >= dayEnd) {
+    ignoredHydrationSlots.forEach(ignored => {
+      if (!log.some(e => e.name === "Drink Water" && e.slot === ignored.slot)) {
+        log.push({
+          name: "Drink Water",
+          parent: "Daily Hydration",
+          slot: ignored.slot,
+          phase: "hydration",
+          severity: 1,
+          delay: 999,
+          score: 0
+        });
+      }
+    });
+    if (ignoredHydrationSlots.length > 0) {
+      saveLog(log);
+      ignoredHydrationSlots = [];  // clear after penalizing
+    }
+  }
 }
 
 /* ========= NAV ========= */
@@ -376,7 +430,6 @@ function updateLiveClock() {
   clock.innerHTML = now.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit",
     hour12: true
   });
 }
@@ -432,7 +485,7 @@ function shouldShowWaterReminder() {
   if (now < dayStart) return null;
 
   const dayEnd = getDayEndMinute();
-  if (dayEnd !== null && now >= dayEnd) return null;  // Stop after last event ends
+  if (dayEnd !== null && now >= dayEnd) return null;
 
   const elapsed = now - dayStart;
   const slot = Math.floor(elapsed / 60);
@@ -440,11 +493,45 @@ function shouldShowWaterReminder() {
   if (slot < 1) return null;
 
   const lastMarked = localStorage.getItem("lastWaterSlot_" + todayKey());
+
+  // Check for nagging on ignored slots (every 15 min)
+  for (let ignored of ignoredHydrationSlots) {
+    const timeSinceIgnore = now - ignored.startMin;
+    const nagCount = Math.floor(timeSinceIgnore / 15);
+    // Show nag if at least 15 min passed since last nag or first ignore
+    if (nagCount > (ignored.lastNag || 0)) {
+      ignored.lastNag = nagCount;
+      return { slot: ignored.slot, startMinute: ignored.startMin, isNag: true };
+    }
+  }
+
+  // Normal reminder
   if (lastMarked === String(slot)) return null;
 
   const startMin = dayStart + slot * 60;
 
-  return { slot, startMinute: startMin };
+  if (elapsed < slot * 60 + 60) return null;
+
+  return { slot, startMinute: startMin, isNag: false };
+}
+
+function trackIgnoredHydration(waterInfo) {
+  if (!waterInfo || waterInfo.isNag) return;
+
+  const notifiedKey = "notified_" + `${todayKey()}_daily_${waterInfo.slot}`;
+  const marked = localStorage.getItem("lastWaterSlot_" + todayKey());
+
+  // If notified but not marked → it's ignored
+  if (localStorage.getItem(notifiedKey) && marked !== String(waterInfo.slot)) {
+    // Add to nagging list if not already there
+    if (!ignoredHydrationSlots.some(i => i.slot === waterInfo.slot)) {
+      ignoredHydrationSlots.push({
+        slot: waterInfo.slot,
+        startMin: waterInfo.startMinute,
+        lastNag: 0
+      });
+    }
+  }
 }
 function markWaterDone(slot) {
   localStorage.setItem("lastWaterSlot_" + todayKey(), String(slot));
@@ -467,10 +554,13 @@ function markWater(slot, startMinute) {
   });
   saveLog(log);
 
-  markWaterDone(slot);
+  localStorage.setItem("lastWaterSlot_" + todayKey(), String(slot));
+
+  // Remove from nagging list if marked
+  ignoredHydrationSlots = ignoredHydrationSlots.filter(i => i.slot !== slot);
+
   render();
 }
-
 
 
 // ──────────────────────────────────────────────
