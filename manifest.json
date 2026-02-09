@@ -2,11 +2,14 @@
   "name": "Discipline Tracker",
   "short_name": "Discipline",
   "description": "Track daily discipline, events, hydration and build better habits",
+  "id": "/",
   "start_url": "/index.html",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2196f3",
   "orientation": "portrait-primary",
+  "categories": ["productivity", "health"],
   "icons": [
     {
       "src": "assets/icon1.png",
